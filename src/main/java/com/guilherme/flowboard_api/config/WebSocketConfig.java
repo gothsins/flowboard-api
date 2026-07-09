@@ -1,6 +1,6 @@
 package com.guilherme.flowboard_api.config;
 
-import com.guilherme.flowboard_api.websocket.StompAuthChannelInterceptor;
+import com.guilherme.flowboard_api.websocket.StompAuthInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -14,7 +14,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
+    private final StompAuthInterceptor stompAuthInterceptor;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -31,6 +31,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(stompAuthChannelInterceptor);
+        registration.interceptors(stompAuthInterceptor);
     }
 }
