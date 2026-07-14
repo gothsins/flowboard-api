@@ -43,7 +43,7 @@ public class AuthController {
         UserDetailsImpl userDetails = new UserDetailsImpl(user);
         String token = jwtService.generateToken(userDetails);
 
-        return ResponseEntity.ok(new AuthResponse(token));
+        return ResponseEntity.ok(new AuthResponse(user.getId(), user.getName(), user.getEmail(), token));
     }
 
     @PostMapping("/login")
@@ -58,6 +58,6 @@ public class AuthController {
         UserDetailsImpl userDetails = new UserDetailsImpl(user);
         String token = jwtService.generateToken(userDetails);
 
-        return ResponseEntity.ok(new AuthResponse(token));
+        return ResponseEntity.ok(new AuthResponse(user.getId(), user.getName(), user.getEmail(), token));
     }
 }

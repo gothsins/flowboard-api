@@ -2,6 +2,7 @@ package com.guilherme.flowboard_api.service;
 
 import com.guilherme.flowboard_api.dto.BoardRequest;
 import com.guilherme.flowboard_api.dto.BoardResponse;
+import com.guilherme.flowboard_api.entity.ActivityLog;
 import com.guilherme.flowboard_api.entity.Board;
 import com.guilherme.flowboard_api.entity.User;
 import com.guilherme.flowboard_api.repository.BoardRepository;
@@ -22,6 +23,7 @@ public class BoardService {
 
     private final BoardRepository boardRepository;
     private final UserRepository userRepository;
+    private final ActivityLogService activityLogService;
 
     public BoardResponse createBoard(BoardRequest request, Long ownerId) {
         User owner = userRepository.findById(ownerId)
@@ -79,6 +81,11 @@ public class BoardService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         board.getMembers().add(newMember);
+
+        User requester = userRepository.findById(requesterId).orElseThrow();
+        activityLogService.log(board, requester, ActivityLog.ActionType.MEMBER_ADDED,
+                newMember.getName() + " was added to the board");
+
         return new BoardResponse(board);
     }
 
