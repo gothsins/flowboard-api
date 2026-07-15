@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>flowboard-api — WebSocket Test Client</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<style>
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    max-width: 720px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  h1 { font-size: 20px; color: #38bdf8; }
+  fieldset {
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  legend { padding: 0 8px; color: #94a3b8; font-size: 13px; }
+  input {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+  }
+  button {
+    background: #38bdf8;
+    color: #0f172a;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #status {
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-bottom: 12px;
+  }
+  .disconnected { background: #7f1d1d; color: #fca5a5; }
+  .connected { background: #14532d; color: #86efac; }
+  #log {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  #log li {
+    background: #1e293b;
+    border-left: 3px solid #38bdf8;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    font-size: 14px;
+    animation: slide-in 0.3s ease;
+  }
+  #log li .meta {
+    color: #64748b;
+    font-size: 12px;
+    display: block;
+    margin-top: 4px;
+  }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+</style>
+</head>
+<body>
+
+<h1>flowboard-api — WebSocket Test Client</h1>
+
+<fieldset>
+  <legend>1. Login</legend>
+  <input id="email" placeholder="email" value="gui@teste.com">
+  <input id="password" type="password" placeholder="password" value="123456">
+  <button id="loginBtn">Login</button>
+  <div id="loginResult" style="margin-top:8px; font-size:13px; color:#94a3b8;"></div>
+</fieldset>
+
+<fieldset>
+  <legend>2. Connect to board</legend>
+  <input id="boardId" placeholder="board id" value="1" style="width:80px;">
+  <button id="connectBtn" disabled>Connect WebSocket</button>
+  <div id="status" class="disconnected">disconnected</div>
+</fieldset>
+
+<fieldset>
+  <legend>3. Live activity feed</legend>
+  <ul id="log"></ul>
+</fieldset>
+
+<script>
+const API_BASE = "http://localhost:8083";
+let token = null;
+let stompClient = null;
+
+const loginBtn = document.getElementById("loginBtn");
+const connectBtn = document.getElementById("connectBtn");
+const statusEl = document.getElementById("status");
+const logEl = document.getElementById("log");
+const loginResultEl = document.getElementById("loginResult");
+
+loginBtn.addEventListener("click", async () => {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    if (!res.ok) throw new Error("Login failed: " + res.status);
+
+    const data = await res.json();
+    token = data.token;
+    loginResultEl.textContent = `Logged in as ${data.name} (id: ${data.id})`;
+    connectBtn.disabled = false;
+  } catch (err) {
+    loginResultEl.textContent = "Error: " + err.message;
+  }
+});
+
+connectBtn.addEventListener("click", () => {
+  const boardId = document.getElementById("boardId").value;
+  const socket = new SockJS(`${API_BASE}/ws`);
+  stompClient = Stomp.over(socket);
+
+  stompClient.connect(
+    { Authorization: "Bearer " + token },
+    () => {
+      statusEl.textContent = "connected";
+      statusEl.className = "connected";
+
+      stompClient.subscribe(`/topic/board/${boardId}`, (message) => {
+        const event = JSON.parse(message.body);
+        addLogEntry(event);
+      });
+    },
+    (error) => {
+      statusEl.textContent = "connection failed";
+      statusEl.className = "disconnected";
+      console.error(error);
+    }
+  );
+});
+
+function addLogEntry(event) {
+  const li = document.createElement("li");
+  li.innerHTML = `
+    <strong>${event.userName}</strong> — ${event.action}<br>
+    ${event.details}
+    <span class="meta">board #${event.boardId} · ${new Date(event.timestamp).toLocaleTimeString()}</span>
+  `;
+  logEl.prepend(li);
+}
+</script>
+
+</body>
+</html>
