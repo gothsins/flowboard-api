@@ -218,7 +218,16 @@ function connectWebSocket() {
   );
 }
 
+let isRendering = false;
+let renderQueued = false;
+
 async function renderBoard() {
+  if (isRendering) {
+    renderQueued = true;
+    return;
+  }
+  isRendering = true;
+
   const columns = await (await fetch(`${API_BASE}/boards/${currentBoardId}/columns`, { headers: authHeaders() })).json();
   boardEl.innerHTML = "";
 
@@ -241,8 +250,10 @@ async function renderBoard() {
       cardDiv.dataset.cardId = card.id;
       cardDiv.innerHTML = `${card.title}${card.assigneeName ? `<div class="assignee">👤 ${card.assigneeName}</div>` : ""}`;
 
-      cardDiv.addEventListener("dragstart", () => {
+      cardDiv.addEventListener("dragstart", (e) => {
         draggedCardId = card.id;
+        e.dataTransfer.setData("text/plain", card.id);
+        e.dataTransfer.effectAllowed = "move";
         cardDiv.classList.add("dragging");
       });
       cardDiv.addEventListener("dragend", () => cardDiv.classList.remove("dragging"));
@@ -256,14 +267,23 @@ async function renderBoard() {
     form.className = "add-card-form";
     form.innerHTML = `<input placeholder="New card title"><button class="ghost">Add</button>`;
     const input = form.querySelector("input");
-    form.querySelector("button").addEventListener("click", async () => {
-      if (!input.value.trim()) return;
-      await fetch(`${API_BASE}/columns/${column.id}/cards`, {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ title: input.value })
-      });
-      input.value = "";
+    const addBtn = form.querySelector("button");
+    addBtn.addEventListener("click", async () => {
+      if (!input.value.trim() || addBtn.disabled) return;
+      addBtn.disabled = true;
+      addBtn.textContent = "...";
+      try {
+        await fetch(`${API_BASE}/columns/${column.id}/cards`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ title: input.value })
+        });
+        input.value = "";
+        await renderBoard();
+      } finally {
+        addBtn.disabled = false;
+        addBtn.textContent = "Add";
+      }
     });
     colDiv.appendChild(form);
 
@@ -273,15 +293,23 @@ async function renderBoard() {
       e.preventDefault();
       colDiv.classList.remove("drag-over");
       if (!draggedCardId) return;
-      await fetch(`${API_BASE}/cards/${draggedCardId}/move`, {
+      const movingId = draggedCardId;
+      draggedCardId = null;
+      await fetch(`${API_BASE}/cards/${movingId}/move`, {
         method: "PATCH",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ targetColumnId: column.id, newPosition: cards.length })
       });
-      draggedCardId = null;
+      await renderBoard();
     });
 
     boardEl.appendChild(colDiv);
+  }
+
+  isRendering = false;
+  if (renderQueued) {
+    renderQueued = false;
+    renderBoard();
   }
 }
 
