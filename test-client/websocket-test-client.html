@@ -2,26 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>flowboard-api — WebSocket Test Client</title>
+<title>flowboard-api — Live Board</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 <style>
+  * { box-sizing: border-box; }
   body {
     font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
     background: #0f172a;
     color: #e2e8f0;
-    max-width: 720px;
-    margin: 40px auto;
-    padding: 0 20px;
+    margin: 0;
+    padding: 24px 32px;
   }
-  h1 { font-size: 20px; color: #38bdf8; }
-  fieldset {
+  h1 { font-size: 20px; color: #38bdf8; margin: 0 0 20px; }
+  .panel {
     border: 1px solid #334155;
     border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 20px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    background: #111827;
   }
-  legend { padding: 0 8px; color: #94a3b8; font-size: 13px; }
+  .panel legend, .panel .label { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; display:block; }
   input {
     background: #1e293b;
     border: 1px solid #334155;
@@ -29,7 +30,6 @@
     padding: 8px 10px;
     border-radius: 6px;
     margin-right: 8px;
-    margin-bottom: 8px;
   }
   button {
     background: #38bdf8;
@@ -40,90 +40,141 @@
     font-weight: 600;
     cursor: pointer;
   }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  button.ghost {
+    background: transparent;
+    color: #38bdf8;
+    border: 1px solid #38bdf8;
+    padding: 4px 10px;
+    font-size: 12px;
+  }
   #status {
-    font-size: 13px;
-    padding: 6px 10px;
+    font-size: 12px;
+    padding: 4px 10px;
     border-radius: 6px;
     display: inline-block;
-    margin-bottom: 12px;
   }
   .disconnected { background: #7f1d1d; color: #fca5a5; }
   .connected { background: #14532d; color: #86efac; }
-  #log {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+
+  #board {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding-bottom: 8px;
   }
-  #log li {
+  .column {
+    background: #111827;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    min-width: 240px;
+    max-width: 240px;
+    padding: 10px;
+    flex-shrink: 0;
+  }
+  .column.drag-over { border-color: #38bdf8; background: #1e293b; }
+  .column h3 {
+    font-size: 13px;
+    color: #cbd5e1;
+    margin: 4px 6px 10px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .column h3 .count { color: #64748b; font-weight: 400; }
+  .card {
     background: #1e293b;
-    border-left: 3px solid #38bdf8;
-    padding: 10px 14px;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 8px 10px;
     margin-bottom: 8px;
-    border-radius: 4px;
-    font-size: 14px;
-    animation: slide-in 0.3s ease;
+    cursor: grab;
+    font-size: 13px;
   }
-  #log li .meta {
+  .card:active { cursor: grabbing; }
+  .card.dragging { opacity: 0.4; }
+  .card .assignee {
     color: #64748b;
-    font-size: 12px;
-    display: block;
+    font-size: 11px;
     margin-top: 4px;
   }
-  @keyframes slide-in {
-    from { opacity: 0; transform: translateX(-10px); }
-    to { opacity: 1; transform: translateX(0); }
+  .add-card-form { display: flex; gap: 4px; margin-top: 6px; }
+  .add-card-form input {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 12px;
+    margin: 0;
   }
+  .add-card-form button { padding: 6px 10px; font-size: 12px; }
+
+  #feed { max-height: 160px; overflow-y: auto; }
+  #feed .entry {
+    background: #1e293b;
+    border-left: 3px solid #38bdf8;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    animation: slide-in .3s ease;
+  }
+  #feed .entry .meta { color: #64748b; }
+  @keyframes slide-in { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
 </style>
 </head>
 <body>
 
-<h1>flowboard-api — WebSocket Test Client</h1>
+<h1>flowboard-api — Live Board</h1>
 
-<fieldset>
-  <legend>1. Login</legend>
+<div class="panel">
+  <span class="label">1. Login</span>
   <input id="email" placeholder="email" value="gui@teste.com">
   <input id="password" type="password" placeholder="password" value="123456">
   <button id="loginBtn">Login</button>
-  <div id="loginResult" style="margin-top:8px; font-size:13px; color:#94a3b8;"></div>
-</fieldset>
+  <span id="loginResult" style="margin-left:10px; font-size:13px; color:#94a3b8;"></span>
+</div>
 
-<fieldset>
-  <legend>2. Connect to board</legend>
+<div class="panel">
+  <span class="label">2. Board</span>
   <input id="boardId" placeholder="board id" value="1" style="width:80px;">
-  <button id="connectBtn" disabled>Connect WebSocket</button>
-  <div id="status" class="disconnected">disconnected</div>
-</fieldset>
+  <button id="connectBtn" disabled>Load &amp; Connect</button>
+  <span id="status" class="disconnected">disconnected</span>
+</div>
 
-<fieldset>
-  <legend>3. Live activity feed</legend>
-  <ul id="log"></ul>
-</fieldset>
+<div id="board"></div>
+
+<div class="panel" style="margin-top:16px;">
+  <span class="label">Live activity feed</span>
+  <div id="feed"></div>
+</div>
 
 <script>
 const API_BASE = "http://localhost:8083";
 let token = null;
 let stompClient = null;
+let currentBoardId = null;
+let draggedCardId = null;
 
 const loginBtn = document.getElementById("loginBtn");
 const connectBtn = document.getElementById("connectBtn");
 const statusEl = document.getElementById("status");
-const logEl = document.getElementById("log");
+const feedEl = document.getElementById("feed");
+const boardEl = document.getElementById("board");
 const loginResultEl = document.getElementById("loginResult");
+
+function authHeaders(extra = {}) {
+  return { "Authorization": "Bearer " + token, ...extra };
+}
 
 loginBtn.addEventListener("click", async () => {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
-
   try {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
-
     if (!res.ok) throw new Error("Login failed: " + res.status);
-
     const data = await res.json();
     token = data.token;
     loginResultEl.textContent = `Logged in as ${data.name} (id: ${data.id})`;
@@ -133,38 +184,113 @@ loginBtn.addEventListener("click", async () => {
   }
 });
 
-connectBtn.addEventListener("click", () => {
-  const boardId = document.getElementById("boardId").value;
+connectBtn.addEventListener("click", async () => {
+  currentBoardId = document.getElementById("boardId").value;
+  await renderBoard();
+  connectWebSocket();
+});
+
+function connectWebSocket() {
+  if (stompClient && stompClient.connected) {
+    stompClient.disconnect();
+  }
   const socket = new SockJS(`${API_BASE}/ws`);
   stompClient = Stomp.over(socket);
+  stompClient.debug = null;
+  connectBtn.disabled = true;
 
   stompClient.connect(
     { Authorization: "Bearer " + token },
     () => {
       statusEl.textContent = "connected";
       statusEl.className = "connected";
-
-      stompClient.subscribe(`/topic/board/${boardId}`, (message) => {
+      stompClient.subscribe(`/topic/board/${currentBoardId}`, (message) => {
         const event = JSON.parse(message.body);
-        addLogEntry(event);
+        addFeedEntry(event);
+        renderBoard();
       });
     },
-    (error) => {
+    () => {
       statusEl.textContent = "connection failed";
       statusEl.className = "disconnected";
-      console.error(error);
+      connectBtn.disabled = false;
     }
   );
-});
+}
 
-function addLogEntry(event) {
-  const li = document.createElement("li");
-  li.innerHTML = `
-    <strong>${event.userName}</strong> — ${event.action}<br>
-    ${event.details}
-    <span class="meta">board #${event.boardId} · ${new Date(event.timestamp).toLocaleTimeString()}</span>
-  `;
-  logEl.prepend(li);
+async function renderBoard() {
+  const columns = await (await fetch(`${API_BASE}/boards/${currentBoardId}/columns`, { headers: authHeaders() })).json();
+  boardEl.innerHTML = "";
+
+  for (const column of columns) {
+    const cards = await (await fetch(`${API_BASE}/columns/${column.id}/cards`, { headers: authHeaders() })).json();
+
+    const colDiv = document.createElement("div");
+    colDiv.className = "column";
+    colDiv.dataset.columnId = column.id;
+
+    colDiv.innerHTML = `<h3>${column.title} <span class="count">${cards.length}</span></h3>`;
+
+    const cardsWrap = document.createElement("div");
+    cardsWrap.className = "cards-wrap";
+
+    cards.forEach(card => {
+      const cardDiv = document.createElement("div");
+      cardDiv.className = "card";
+      cardDiv.draggable = true;
+      cardDiv.dataset.cardId = card.id;
+      cardDiv.innerHTML = `${card.title}${card.assigneeName ? `<div class="assignee">👤 ${card.assigneeName}</div>` : ""}`;
+
+      cardDiv.addEventListener("dragstart", () => {
+        draggedCardId = card.id;
+        cardDiv.classList.add("dragging");
+      });
+      cardDiv.addEventListener("dragend", () => cardDiv.classList.remove("dragging"));
+
+      cardsWrap.appendChild(cardDiv);
+    });
+
+    colDiv.appendChild(cardsWrap);
+
+    const form = document.createElement("div");
+    form.className = "add-card-form";
+    form.innerHTML = `<input placeholder="New card title"><button class="ghost">Add</button>`;
+    const input = form.querySelector("input");
+    form.querySelector("button").addEventListener("click", async () => {
+      if (!input.value.trim()) return;
+      await fetch(`${API_BASE}/columns/${column.id}/cards`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ title: input.value })
+      });
+      input.value = "";
+    });
+    colDiv.appendChild(form);
+
+    colDiv.addEventListener("dragover", (e) => { e.preventDefault(); colDiv.classList.add("drag-over"); });
+    colDiv.addEventListener("dragleave", () => colDiv.classList.remove("drag-over"));
+    colDiv.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      colDiv.classList.remove("drag-over");
+      if (!draggedCardId) return;
+      await fetch(`${API_BASE}/cards/${draggedCardId}/move`, {
+        method: "PATCH",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ targetColumnId: column.id, newPosition: cards.length })
+      });
+      draggedCardId = null;
+    });
+
+    boardEl.appendChild(colDiv);
+  }
+}
+
+function addFeedEntry(event) {
+  const div = document.createElement("div");
+  div.className = "entry";
+  div.innerHTML = `<strong>${event.userName}</strong> — ${event.action}: ${event.details}
+    <div class="meta">${new Date(event.timestamp).toLocaleTimeString()}</div>`;
+  feedEl.prepend(div);
 }
 </script>
 
