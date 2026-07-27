@@ -13,7 +13,7 @@ public class ActivityEventConsumer {
 
     private final SimpMessagingTemplate messagingTemplate;
 
-    @KafkaListener(topics = KafkaTopics.BOARD_ACTIVITY, groupId = "flowboard-api")
+    @KafkaListener(topics = KafkaTopics.BOARD_ACTIVITY, groupId = "flowboard-api-#{T(java.util.UUID).randomUUID()}")
     public void consume(ActivityEventMessage event) {
         messagingTemplate.convertAndSend("/topic/board/" + event.getBoardId(), event);
     }
