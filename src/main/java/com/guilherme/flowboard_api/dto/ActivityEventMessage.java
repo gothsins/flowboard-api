@@ -4,12 +4,13 @@ import com.guilherme.flowboard_api.entity.ActivityLog;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import java.util.UUID;
 
 @Getter
 @Setter
 @NoArgsConstructor
 public class ActivityEventMessage {
-
+    private String eventId = UUID.randomUUID().toString();
     private Long boardId;
     private String userName;
     private String action;
