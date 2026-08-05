@@ -25,7 +25,7 @@ public class ActivityEventConsumer {
     )
     @KafkaListener(topics = KafkaTopics.BOARD_ACTIVITY, groupId = "flowboard-activity-group")
     public void consume(ActivityEventMessage event) {
-        if (!processedEvents.add(event.getEventId())) {
+        if (processedEvents.contains(event.getEventId())) {
             log.info("Evento duplicado ignorado: {}", event.getEventId());
             return;
         }
@@ -34,5 +34,6 @@ public class ActivityEventConsumer {
             throw new RuntimeException("Falha simulada para testar retry/DLT");
         }
         messagingTemplate.convertAndSend("/topic/board/" + event.getBoardId(), event);
+        processedEvents.add(event.getEventId());
     }
 }
