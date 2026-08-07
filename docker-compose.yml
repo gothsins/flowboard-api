@@ -49,7 +49,7 @@ services:
         user_admin="admin-secret"
         user_app="app-secret";
       KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
-      KAFKA_SUPER_USERS: "User:admin;User:app;User:ANONYMOUS"
+      KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS"
 
 
   app:
