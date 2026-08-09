@@ -7,6 +7,7 @@ import com.guilherme.flowboard_api.entity.User;
 import com.guilherme.flowboard_api.repository.UserRepository;
 import com.guilherme.flowboard_api.security.JwtService;
 import com.guilherme.flowboard_api.security.UserDetailsImpl;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -47,6 +48,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @RateLimiter(name = "login", fallbackMethod = "loginRateLimitFallback")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
@@ -59,5 +61,9 @@ public class AuthController {
         String token = jwtService.generateToken(userDetails);
 
         return ResponseEntity.ok(new AuthResponse(user.getId(), user.getName(), user.getEmail(), token));
+    }
+
+    public ResponseEntity<AuthResponse> loginRateLimitFallback(LoginRequest request, io.github.resilience4j.ratelimiter.RequestNotPermitted ex) {
+        return ResponseEntity.status(429).body(null);
     }
 }
