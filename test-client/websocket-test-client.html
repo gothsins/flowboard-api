@@ -238,7 +238,13 @@ async function renderBoard() {
     colDiv.className = "column";
     colDiv.dataset.columnId = column.id;
 
-    colDiv.innerHTML = `<h3>${column.title} <span class="count">${cards.length}</span></h3>`;
+    const h3 = document.createElement("h3");
+    h3.textContent = column.title;
+    const countSpan = document.createElement("span");
+    countSpan.className = "count";
+    countSpan.textContent = cards.length;
+    h3.appendChild(countSpan);
+    colDiv.appendChild(h3);
 
     const cardsWrap = document.createElement("div");
     cardsWrap.className = "cards-wrap";
@@ -248,7 +254,13 @@ async function renderBoard() {
       cardDiv.className = "card";
       cardDiv.draggable = true;
       cardDiv.dataset.cardId = card.id;
-      cardDiv.innerHTML = `${card.title}${card.assigneeName ? `<div class="assignee">👤 ${card.assigneeName}</div>` : ""}`;
+      cardDiv.textContent = card.title;
+      if (card.assigneeName) {
+      const assigneeDiv = document.createElement("div");
+      assigneeDiv.className = "assignee";
+      assigneeDiv.textContent = `👤 ${card.assigneeName}`;
+      cardDiv.appendChild(assigneeDiv);
+      }
 
       cardDiv.addEventListener("dragstart", (e) => {
         draggedCardId = card.id;
@@ -316,8 +328,18 @@ async function renderBoard() {
 function addFeedEntry(event) {
   const div = document.createElement("div");
   div.className = "entry";
-  div.innerHTML = `<strong>${event.userName}</strong> — ${event.action}: ${event.details}
-    <div class="meta">${new Date(event.timestamp).toLocaleTimeString()}</div>`;
+
+  const strong = document.createElement("strong");
+  strong.textContent = event.userName;
+
+  const metaDiv = document.createElement("div");
+  metaDiv.className = "meta";
+  metaDiv.textContent = new Date(event.timestamp).toLocaleTimeString();
+
+  div.appendChild(strong);
+  div.append(` — ${event.action}: ${event.details}`);
+  div.appendChild(metaDiv);
+
   feedEl.prepend(div);
 }
 </script>
