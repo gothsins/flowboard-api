@@ -28,9 +28,11 @@ This is the second project in a two-project backend portfolio (alongside [financ
 | Security | Spring Security, JWT (jjwt 0.12)     |
 | Persistence | Spring Data JPA, PostgreSQL          |
 | Real-time | Spring WebSocket (STOMP over SockJS) |
+| Event streaming | Apache Kafka                         |
+| Resilience | Resilience4j (retry, rate limiting)  |
 | Docs | springdoc-openapi (Swagger UI)       |
 | Build | Maven                                |
-| Local infra | Docker Compose (PostgreSQL)          |
+| Local infra | Docker Compose (PostgreSQL, Kafka)   |
 
 ## Architecture notes
 
@@ -54,11 +56,31 @@ WebSocket connections don't pass through the standard servlet filter chain the w
 
 A custom `AuthenticationEntryPoint` ensures missing/invalid tokens return `401 Unauthorized`, while `AccessDeniedException` (thrown from ownership/membership checks) returns `403 Forbidden` — handled centrally in a `@RestControllerAdvice`.
 
+## Kafka & Event-Driven Architecture
+
+Board activity (card created, moved, etc.) is published to Kafka and consumed asynchronously to broadcast over WebSocket — decoupling the write path from real-time delivery.
+
+- **Fixed consumer group ID** — prevents the consumer from being treated as "new" on every restart, which would otherwise cause it to re-read the entire topic history
+- **Idempotency guard** — each event carries a unique `eventId`; the consumer tracks processed IDs and skips duplicates, preventing the same activity from being broadcast twice on reprocessing
+- **Retry with exponential backoff** — transient failures are retried automatically (3 attempts, 1s/2s/4s backoff) via `@RetryableTopic`
+- **Dead Letter Topic (DLT)** — after exhausting retries, the message is routed to a dedicated `-dlt` topic instead of being silently dropped or blocking the consumer indefinitely (the "poison pill" problem)
+
+> A unit test suite covers this behavior directly (see [Testing](#testing)), including a regression test for an ordering bug where marking an event as "processed" before confirming successful delivery silently defeated the retry mechanism.
+
+## Security Hardening
+
+Beyond baseline JWT/RBAC, the following was implemented and validated with real attack payloads — not just configured on faith:
+
+- **Kafka authentication & authorization** — broker requires SASL/PLAIN; the app's Kafka user runs with least-privilege ACLs (`Write`/`Read`/`Describe`/`Create` scoped to the topic/consumer-group prefix, plus `IdempotentWrite`) instead of a super-user
+- **Stored XSS prevention** — the WebSocket test client rendered user-controlled data (card titles, activity feed) via `innerHTML`, allowing a malicious card title to execute JavaScript for any viewer. Fixed with `textContent`/DOM APIs; verified with both a benign and an active payload
+- **Content-Security-Policy** — restricts script execution to allow-listed sources, as defense-in-depth
+- **Rate limiting on login** — 5 attempts/minute via Resilience4j, `429` past threshold
+- **Dependency scanning** — GitHub Dependabot enabled
+
 ## Running locally
 
 ```bash
-docker compose up -d
-mvn spring-boot:run
+docker compose up -d --build
 ```
 
 The API starts on `http://localhost:8083`. Swagger UI is available at `http://localhost:8083/swagger-ui/index.html`.
@@ -109,11 +131,11 @@ Full request/response schemas available via Swagger UI.
 
 ## Roadmap
 
-This project is built to evolve in place — the domain logic stays the same while the infrastructure underneath is progressively swapped for more production-grade equivalents:
-
+- [x] Deploy to AWS (EC2 + Docker Compose)
+- [x] Rate limiting on authentication
 - [ ] Replace the in-memory STOMP broker (`enableSimpleBroker`) with a Kafka-backed relay, enabling horizontal scaling across multiple API instances
-- [ ] Deploy to AWS (ECS + RDS), replacing local Docker Compose Postgres
-- [ ] Rate limiting on WebSocket connections (DoS mitigation)
+- [ ] Managed database (AWS RDS) and managed Kafka, replacing self-hosted Docker Compose
+- [ ] Observability stack (Actuator + Prometheus + Grafana)
 
 ## Architecture evolution
 
@@ -122,15 +144,26 @@ This project is deliberately built in two layers: **domain logic** (entities, se
 | Concern | Today | Planned |
 |---|---|---|
 | Real-time message distribution | In-memory STOMP broker (`enableSimpleBroker`), single instance | Kafka-backed relay (`enableStompBrokerRelay`), supports multiple API instances |
-| Database | Local PostgreSQL via Docker Compose | AWS RDS (managed PostgreSQL) |
-| Application hosting | `localhost` | AWS ECS |
-| Secrets | `.properties` fallback value (local dev only) | Environment variables / AWS Secrets Manager |
+| Event streaming | Kafka (Docker Compose), SASL + least-privilege ACLs | Managed Kafka (e.g. MSK) |
+| Database | PostgreSQL via Docker Compose | AWS RDS (managed PostgreSQL) |
+| Application hosting | AWS EC2 + Docker Compose | AWS ECS |
+| Secrets | Environment variables (Docker Compose) | AWS Secrets Manager |
 
 The trigger for each change is a real scaling limitation, not novelty for its own sake:
 - **Kafka becomes necessary** the moment the API runs as more than one instance — an in-memory broker can't relay a message from instance A to a client connected on instance B.
 - **AWS becomes necessary** for the same reasons any production deployment needs managed infrastructure: uptime, backups, and horizontal scaling that a local machine or a single low-cost host can't provide reliably.
 
 This mirrors the same practical, incremental approach used in [finance-api](#) — infrastructure is added when a concrete need justifies it, not preemptively.
+
+## Testing
+
+Unit tests cover the Kafka consumer's failure-handling behavior directly, rather than relying on manual verification:
+
+- Duplicate events (same `eventId`) are processed exactly once
+- Simulated failures trigger the expected exception path
+- A regression test locks in a fix for an ordering bug where marking an event "processed" before confirming delivery silently broke retry
+
+Run with `mvn test`.
 
 ## License
 
