@@ -1,0 +1,7 @@
+# Dockerfile snippet: copy your built jar and start script, then use start.sh as entrypoint
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+COPY build/libs/app.jar app.jar
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+ENTRYPOINT ["/usr/local/bin/start.sh"]

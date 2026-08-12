@@ -1,0 +1,32 @@
+version: '3.7'
+
+services:
+  app:
+    image: flowboard-api-app:latest
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowboard_db
+      SPRING_DATASOURCE_USERNAME: flowboard_user
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      SPRING_KAFKA_PROPERTIES_SASL_MECHANISM: PLAIN
+      SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG: >-
+        org.apache.kafka.common.security.plain.PlainLoginModule required
+        username="app"
+        password="${KAFKA_APP_PASSWORD}";
+    secrets:
+      - jwt_secret
+
+  kafka:
+    image: apache/kafka:latest
+    # kafka service managed separately; keep in prod stack as needed
+
+secrets:
+  jwt_secret:
+    external: true
