@@ -33,6 +33,8 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:SASL_PLAINTEXT,INTERNAL:SASL_PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: "-Xmx400m -Xms400m"
+      KAFKA_MESSAGE_MAX_BYTES: "1048576"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
@@ -40,14 +42,14 @@ services:
         org.apache.kafka.common.security.plain.PlainLoginModule required
         username="admin"
         password="admin-secret"
-        user_admin="admin-secret"
-        user_app="app-secret";
+        user_admin="${KAFKA_ADMIN_PASSWORD}"
+        user_app="${KAFKA_APP_PASSWORD}";
       KAFKA_LISTENER_NAME_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG: >-
         org.apache.kafka.common.security.plain.PlainLoginModule required
         username="admin"
         password="admin-secret"
-        user_admin="admin-secret"
-        user_app="app-secret";
+        user_admin="${KAFKA_ADMIN_PASSWORD}"
+        user_app="${KAFKA_APP_PASSWORD}";
       KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
       KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS"
 
@@ -61,7 +63,6 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowboard_db
       SPRING_DATASOURCE_USERNAME: flowboard_user
       SPRING_DATASOURCE_PASSWORD: flowboard_pass
-      JWT_SECRET: troque-este-segredo-em-producao-minimo-256-bits-1234567890
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
       SPRING_KAFKA_PROPERTIES_SASL_MECHANISM: PLAIN
