@@ -41,18 +41,15 @@ services:
       KAFKA_LISTENER_NAME_INTERNAL_PLAIN_SASL_JAAS_CONFIG: >-
         org.apache.kafka.common.security.plain.PlainLoginModule required
         username="admin"
-        password="admin-secret"
         user_admin="${KAFKA_ADMIN_PASSWORD}"
         user_app="${KAFKA_APP_PASSWORD}";
-      KAFKA_LISTENER_NAME_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG: >-
+        KAFKA_LISTENER_NAME_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG: >-
         org.apache.kafka.common.security.plain.PlainLoginModule required
         username="admin"
-        password="admin-secret"
         user_admin="${KAFKA_ADMIN_PASSWORD}"
         user_app="${KAFKA_APP_PASSWORD}";
       KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
       KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS"
-
 
   app:
     build: .
@@ -63,18 +60,42 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowboard_db
       SPRING_DATASOURCE_USERNAME: flowboard_user
       SPRING_DATASOURCE_PASSWORD: flowboard_pass
+      JWT_SECRET: ${JWT_SECRET}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
       SPRING_KAFKA_PROPERTIES_SASL_MECHANISM: PLAIN
       SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG: >-
         org.apache.kafka.common.security.plain.PlainLoginModule required
         username="app"
-        password="app-secret";
+        password="${KAFKA_APP_PASSWORD}";
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_started
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: flowboard-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:9.0.0
+    container_name: flowboard-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
 
 volumes:
   flowboard_pgdata:

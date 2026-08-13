@@ -2,6 +2,7 @@ package com.guilherme.flowboard_api.config;
 
 import com.guilherme.flowboard_api.security.JwtAuthenticationEntryPoint;
 import com.guilherme.flowboard_api.security.JwtAuthenticationFilter;
+import com.guilherme.flowboard_api.security.RequestSizeLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +24,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RequestSizeLimitFilter requestSizeLimitFilter;
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -57,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(requestSizeLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
