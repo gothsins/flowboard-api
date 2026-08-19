@@ -6,11 +6,13 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.function.Function;
 
+@Slf4j
 @Service
 public class JwtService {
 
@@ -21,6 +23,7 @@ public class JwtService {
     private long expirationMs;
 
     private SecretKey getSigningKey() {
+        log.info("Using secret with hashCode: {}", secret.hashCode());
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
